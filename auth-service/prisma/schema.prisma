@@ -23,6 +23,11 @@ model User {
   updatedAt     DateTime       @default(now()) @updatedAt
   refreshTokens RefreshToken[]
   userRole      UserRole[]
+
+  // ✅ Added Zoom OAuth fields  
+  zoomAccessToken  String?
+  zoomRefreshToken String?
+  zoomTokenExpiry  DateTime?
 }
 
 model RefreshToken {

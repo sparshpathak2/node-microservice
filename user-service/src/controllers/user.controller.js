@@ -235,4 +235,79 @@ const checkUserPermissions = async (req, res) => {
 
 }
 
-export { getUsers, getUser, updateUser, deleteUser, checkUserPermissions };
+const updateZoomToken = async (req, res) => {
+    const { userId, zoomAccessToken, zoomRefreshToken, zoomTokenExpiry } = req.body;
+
+    if (!userId || !zoomAccessToken || !zoomRefreshToken) {
+        return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                zoomAccessToken,
+                zoomRefreshToken,
+                zoomTokenExpiry: new Date(Number(zoomTokenExpiry)),
+            },
+        });
+
+        res.json({ message: "Zoom token updated successfully" });
+    } catch (error) {
+        console.error("Error updating Zoom token:", error);
+        res.status(500).json({ error: "Failed to update Zoom token" });
+    }
+};
+
+const getZoomCredentials = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                zoomAccessToken: true,
+                zoomRefreshToken: true,
+                zoomTokenExpiry: true,
+            },
+        });
+
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        res.json({ success: true, ...user });
+    } catch (error) {
+        console.error("Database query failed:", error);
+        res.status(500).json({ success: false, message: "Internal server error" });
+    }
+};
+
+const getZoomStatus = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        const isConnected =
+            !!(user.zoomAccessToken &&
+                user.zoomRefreshToken &&
+                user.zoomTokenExpiry &&
+                new Date(user.zoomTokenExpiry) > new Date());
+
+        return res.json({
+            success: true,
+            isConnected,
+            message: isConnected ? "Zoom is connected." : "Zoom is not connected. Please authenticate.",
+            zoomTokenExpiry: user.zoomTokenExpiry || null
+        });
+
+    } catch (error) {
+        console.error("Error checking Zoom status:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error." });
+    }
+};
+
+export { getUsers, getUser, updateUser, deleteUser, checkUserPermissions, updateZoomToken, getZoomCredentials, getZoomStatus };

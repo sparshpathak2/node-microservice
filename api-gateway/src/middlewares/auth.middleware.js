@@ -44,6 +44,11 @@ const authMiddleware = async (req, res, next) => {
         }
 
         req.user = user
+        console.log("user:", user)
+
+        // Attach user data to request headers for service-level access
+        req.headers["x-user-id"] = user.id;
+        // req.headers["x-user-role"] = user.role;
 
         // 3. If the token is valid then return next()
         return next()
@@ -55,43 +60,5 @@ const authMiddleware = async (req, res, next) => {
     }
 
 }
-
-const authMiddlewareNew = asyncHandler(async (req, res, next) => {
-    console.log("Auth middleware called");
-
-    const publicRoutes = ["/login", "/signup"];
-
-    // If the request is for a public route, allow it without authentication check
-    if (publicRoutes.includes(req.path)) {
-        return next();
-    }
-
-    // 1. Get the AT and RT from the cookies
-    const accessToken = req.cookies?.accessToken;
-    const refreshToken = req.cookies?.refreshToken;
-
-    if (!accessToken && !refreshToken) {
-        return res.status(401).json({ message: "Unauthorized: No tokens provided" });
-    }
-
-    // 2. Hit the verify-token route in the authentication service
-    const response = await axios.post(
-        `${process.env.AUTH_SERVICE_URL}/verify-token`,
-        { accessToken, refreshToken },
-        {
-            withCredentials: true,
-            headers: {
-                Cookie: req.headers.cookie, // Forward cookies from the original request
-            }
-        }
-    );
-
-    if (!response.data.valid) {
-        return res.status(401).json({ message: "Token is expired, please login again." });
-    }
-
-    // 3. If the token is valid then return next()
-    return next();
-});
 
 export default authMiddleware

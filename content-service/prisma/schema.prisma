@@ -1,0 +1,118 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ✅ Enum for Content Status
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ✅ ContentType Table (For Extendability)
+model ContentType {
+  id        String   @id @default(uuid())
+  name      String   @unique // POSTS, EVENTS, CHATS, IMAGES
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation
+  contents Content[]
+}
+
+// ✅ Content Table (Stores Metadata & Links to Space)
+model Content {
+  id            String        @id @default(uuid())
+  title         String
+  description   String?
+  contentTypeId String // FK to ContentType
+  spaceId       String // 🔥 Store Space ID (Foreign Key from Community Service)
+  createdBy     String // 🔥 Store User ID (Foreign Key from User Service)
+  status        ContentStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations  
+  contentType ContentType @relation(fields: [contentTypeId], references: [id])
+
+  // ✅ Corrected Relations (Added `references` on child models)
+  postContent  Posts?
+  eventContent Events?
+  chatContent  Chats?
+  imageContent Images?
+}
+
+// ✅ Separate Tables for Each Content Type
+
+// 🔥 Posts (Text-based Content)
+model Posts {
+  id        String   @id @default(uuid())
+  contentId String   @unique // FK to Content
+  title     String // 🔥 Post title
+  content   Json // 🔥 Editor.js JSON data (specific to posts)
+  createdBy String // 🔥 User who created the content
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contentRel Content @relation(fields: [contentId], references: [id])
+}
+
+// 🔥 Events (With Date & Location)
+model Events {
+  id        String   @id @default(uuid())
+  contentId String   @unique // FK to Content
+  eventDate DateTime
+  location  String?
+  createdBy String // 🔥 User who created the content
+
+  // ✅ Zoom Integration Fields
+  zoomMeetingId String? // 🔥 Unique Meeting ID from Zoom
+  zoomHostId    String? // 🔥 Host ID from Zoom
+  zoomJoinUrl   String? // 🔥 Participant Join Link
+  zoomStartUrl  String? // 🔥 Host Start Link
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contentRel Content @relation(fields: [contentId], references: [id])
+}
+
+// 🔥 Chats (Messages)
+model Chats {
+  id        String   @id @default(uuid())
+  contentId String   @unique // FK to Content
+  message   String
+  createdBy String // 🔥 User who created the content
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contentRel Content @relation(fields: [contentId], references: [id])
+}
+
+// 🔥 Images (With Image URL)
+model Images {
+  id        String   @id @default(uuid())
+  contentId String   @unique // FK to Content
+  imageUrl  String
+  createdBy String // 🔥 User who created the content
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contentRel Content @relation(fields: [contentId], references: [id])
+}
+
+// 🔥 User Model (Only FK Reference to User Service)
+model User {
+  id String @id @default(uuid())
+}

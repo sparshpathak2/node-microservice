@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMS
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
+  RAZORPAY
+  PAYPAL
+  OTHER
+}
+
+// PAYWALL MODEL
+model Paywall {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  currency    String // e.g., USD, INR
+  spaceId     String? // 🔥 Soft Reference to Space in Community Service
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  payments Payment[]
+}
+
+// PAYMENT MODEL
+model Payment {
+  id        String        @id @default(uuid())
+  userId    String // Reference to User Service
+  paywallId String // Reference to Paywall
+  amount    Float // Transaction Amount
+  currency  String // Currency (e.g., USD, INR)
+  status    PaymentStatus @default(PENDING) // Payment Status
+
+  // 🔥 3rd-Party Gateway Fields
+  provider        PaymentProvider // e.g., "STRIPE", "RAZORPAY"
+  transactionId   String? // External Payment Gateway Transaction ID
+  paymentIntentId String? // Stripe/Razorpay Payment Intent ID
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  paywall Paywall  @relation(fields: [paywallId], references: [id])
+  refunds Refund[]
+}
+
+// REFUND MODEL
+model Refund {
+  id        String        @id @default(uuid())
+  paymentId String // Reference to Payment
+  refundId  String // 3rd-party Refund Transaction ID
+  amount    Float
+  status    PaymentStatus @default(REFUNDED)
+  createdAt DateTime      @default(now())
+
+  // Relations
+  payment Payment @relation(fields: [paymentId], references: [id])
+}

@@ -41,35 +41,6 @@ const permissionsMiddlewareOld = async (resource, action) => {
     }
 }
 
-// const permissionsMiddleware = async (allowedRole) => {
-//     // 0. This middleware handles RBAC
-//     console.log("RBAC Middleware ran")
-
-//     // 1. Get the user id from the req
-//     const userId = req.user?.id
-//     console.log("userId:", userId)
-
-//     // 2. Send post request to check permissions with user id, resource and action
-//     try {
-//         const response = await axios.post(
-//             `${process.env.USER_SERVICE_URL}/permissions/check`,
-//             {
-//                 userId,
-//                 allowedRole
-//             }
-//         )
-
-//         // 3. If allowed = true then allow user otherwise access denied 
-//         if (!response.isAllowed) {
-//             return res.status(403).json({ success: false, isAllowed: false, message: "You don't have right permissions" })
-//         }
-
-//         return next()
-//     } catch (error) {
-//         return res.status(500).json({ message: "Internal server error" })
-//     }
-// }
-
 const permissionsMiddleware = (allowedRole) => {
     return async (req, res, next) => {  // Middleware must return a function
         console.log("RBAC Middleware ran");

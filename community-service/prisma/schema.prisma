@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 🔥 Enum for Space Visibility Options
+enum SpaceVisibility {
+  OPEN // Any community member can view (Paid or Free)
+  SECRET // Only members with access can view
+}
+
+// 🔥 Enum for Membership Status
+enum MembershipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BANNED
+}
+
+model Community {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String // Reference to User Service
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  spaceGroups SpaceGroup[] @relation(name: "CommunityToSpaceGroup")
+  spaces      Space[]      @relation(name: "CommunityToSpace")
+  members     Membership[] @relation(name: "CommunityToMembership")
+}
+
+model SpaceGroup {
+  id             String           @id @default(uuid())
+  name           String
+  description    String?
+  visibilityType SpaceVisibility? @default(OPEN) // 🔥 Open, Secret
+  communityId    String
+  paywallId      String? // 🔥 Reference to Payment Service
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  community Community @relation(fields: [communityId], references: [id], name: "CommunityToSpaceGroup")
+  spaces    Space[]   @relation(name: "SpaceGroupToSpace")
+}
+
+model SpaceType {
+  id   String @id @default(uuid())
+  name String @unique
+
+  // Relation field for bidirectional reference
+  spaces Space[] @relation("SpaceToSpaceType")
+}
+
+model Space {
+  id           String          @id @default(uuid())
+  name         String
+  description  String?
+  accessType   SpaceVisibility @default(OPEN) // 🔥 Open, Private, Secret
+  communityId  String
+  spaceGroupId String?
+  spaceTypeId  String
+  paywallId    String? // 🔥 Reference to Payment Service
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  community  Community   @relation(fields: [communityId], references: [id], name: "CommunityToSpace")
+  spaceGroup SpaceGroup? @relation(fields: [spaceGroupId], references: [id], name: "SpaceGroupToSpace")
+  spaceType  SpaceType   @relation(fields: [spaceTypeId], references: [id], name: "SpaceToSpaceType")
+
+  // 🔥 Ensure bidirectional relation
+  @@unique([name, communityId]) // Optional: Prevent duplicate Space names in a Community
+}
+
+model Membership {
+  id          String            @id @default(uuid())
+  userId      String // Reference to User Service
+  communityId String
+  status      MembershipStatus? @default(APPROVED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  community Community @relation(fields: [communityId], references: [id], name: "CommunityToMembership")
+}

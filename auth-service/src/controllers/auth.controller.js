@@ -2,6 +2,8 @@ import prisma from "../db/db.config.js";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcrypt";
+import axios from "axios";
+import { updateUserZoomToken } from "../services/zoom.service.js";
 
 // User signup controller
 const signupUserOld = async (req, res) => {
@@ -164,6 +166,9 @@ const loginUser = async (req, res) => {
     // 1. Get email, password from the req body
     const { email, password } = req.body
 
+    // const userId = req.headers["x-user-id"];
+    // console.log("userId in loginUser:", userId)
+
     // 2. Check if the user exists in the db
     const existingUser = await prisma.user.findUnique({
         where: {
@@ -314,4 +319,77 @@ const verifyToken = async (req, res) => {
     }
 }
 
-export { signupUser, loginUser, logoutUser, verifyToken }
+// Zoom Callback controller
+const zoomCallback = async (req, res) => {
+    const { code, state } = req.query; // Step 1: Get authorization code from Zoom
+
+    // const userId = req.headers["x-user-id"];
+
+    console.log("code in zoomcallback:", code)
+    console.log("userId in zoomcallback:", state)
+
+    if (!code) {
+        return res.status(400).json({ error: "Authorization code missing" });
+    }
+
+    const userId = state; // Use userId from query param
+
+    try {
+        // Step 2: Exchange code for access token
+        const response = await axios.post("https://zoom.us/oauth/token", null, {
+            params: {
+                grant_type: "authorization_code",
+                code,
+                redirect_uri: process.env.ZOOM_REDIRECT_URI,
+            },
+            headers: {
+                Authorization: `Basic ${Buffer.from(
+                    `${process.env.ZOOM_CLIENT_ID}:${process.env.ZOOM_CLIENT_SECRET}`
+                ).toString("base64")}`,
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+        });
+
+        console.log("Response from zoom:", response.data)
+        const { access_token, refresh_token, expires_in } = response.data;
+
+
+        // console.log("access_token, refresh_token, expires_in, req.user.id", access_token, refresh_token, expires_in, req.user.id)
+
+        // Step 3: Store tokens in User Service
+        // const success = await updateUserZoomToken(req.user.id, access_token, refresh_token, expires_in);
+        const success = await updateUserZoomToken(userId, access_token, refresh_token, expires_in);
+
+        if (success) {
+            res.json({ message: "Zoom account connected successfully" });
+        } else {
+            res.status(500).json({ error: "Failed to save Zoom token" });
+        }
+    } catch (error) {
+        console.error("Zoom authentication failed:", error?.response?.data || error.message);
+        res.status(500).json({ error: "Zoom authentication failed" });
+    }
+};
+
+// Update Zoom token controller
+const updateZoomToken = async (req, res) => {
+    const { userId } = req.params;
+    const { zoomAccessToken, zoomRefreshToken, zoomTokenExpiry } = req.body;
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                zoomAccessToken,
+                zoomRefreshToken,
+                zoomTokenExpiry,
+            },
+        });
+
+        res.json({ success: true, message: "Zoom tokens updated successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export { signupUser, loginUser, logoutUser, verifyToken, zoomCallback, updateZoomToken }
