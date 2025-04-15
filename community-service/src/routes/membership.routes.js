@@ -1,5 +1,5 @@
 import express from "express";
-import { createMembership, deleteMembership, getAllMemberships, getMembershipById, updateMembership } from "../controllers/membership.controller.js";
+import { createMembership, deleteMembership, getAllMemberships, getMembershipById, updateMembership, checkMembership } from "../controllers/membership.controller.js";
 
 const router = express.Router();
 
@@ -10,6 +10,8 @@ router.get("/", getAllMemberships);
 
 // ✅ Get a space group by id
 router.get("/", getMembershipById);
+
+router.get("/check", checkMembership);
 
 // ✅ Create a new space group
 router.post("/", createMembership);

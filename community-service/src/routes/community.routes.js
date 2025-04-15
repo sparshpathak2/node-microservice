@@ -4,7 +4,8 @@ import {
     getCommunityById,
     createCommunity,
     updateCommunity,
-    deleteCommunity
+    deleteCommunity,
+    getCommunityBySlug
 } from "../controllers/community.controller.js";
 
 const router = express.Router();
@@ -14,6 +15,9 @@ router.get("/", getAllCommunities);
 
 // ✅ Get a community by id
 router.get("/", getCommunityById);
+
+// ✅ Get a community by slug
+router.get("/slug/:slug", getCommunityBySlug);
 
 // ✅ Create a new community
 router.post("/", createCommunity);

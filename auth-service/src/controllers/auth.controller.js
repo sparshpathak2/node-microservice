@@ -94,12 +94,12 @@ const signupUserOld = async (req, res) => {
 }
 
 const signupUser = async (req, res) => {
-    const { username, email, password, roles } = req.body;  // Accept array of roles
+    const { username, email, password, roles, communityId } = req.body;  // Accept array of roles
 
     try {
         // 1. Validate input
-        if (!username || !email || !password) {
-            return res.status(400).json({ success: false, message: "Username, email, and password are required" });
+        if (!username || !email || !password || !communityId) {
+            return res.status(400).json({ success: false, message: "Username, email, password, and communityId are required" });
         }
 
         // 2. Check if the user already exists
@@ -136,7 +136,7 @@ const signupUser = async (req, res) => {
         });
 
         // 6. Generate Access & Refresh Tokens
-        const accessToken = jwt.sign({ id: newUser.id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "5m" });
+        const accessToken = jwt.sign({ id: newUser.id, communityId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "5m" });
         const refreshToken = uuidv4();
 
         // 7. Store refresh token in DB
@@ -144,6 +144,7 @@ const signupUser = async (req, res) => {
             data: {
                 refreshToken,
                 userId: newUser.id,
+                communityId,
                 expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 min
             }
         });
@@ -152,7 +153,7 @@ const signupUser = async (req, res) => {
         res.cookie("accessToken", accessToken, { httpOnly: true, sameSite: "None" });
         res.cookie("refreshToken", refreshToken, { httpOnly: true, sameSite: "None" });
 
-        return res.status(201).json({ success: true, message: "User created successfully" });
+        return res.status(201).json({ success: true, message: "User created successfully", newUser });
 
     } catch (error) {
         console.error("Signup error:", error);
@@ -161,13 +162,17 @@ const signupUser = async (req, res) => {
 };
 
 // User login controller
-const loginUser = async (req, res) => {
+const loginUserOld = async (req, res) => {
     // 0. This controller handles the login of the user
     // 1. Get email, password from the req body
-    const { email, password } = req.body
+    const { email, password, communityId } = req.body
 
     // const userId = req.headers["x-user-id"];
     // console.log("userId in loginUser:", userId)
+
+    if (!email || !password || !communityId) {
+        return res.status(400).json({ success: false, message: "Email, password and communityId are required" })
+    }
 
     // 2. Check if the user exists in the db
     const existingUser = await prisma.user.findUnique({
@@ -188,7 +193,7 @@ const loginUser = async (req, res) => {
     }
 
     // 4. If the password is correct then create a new AT and RT
-    const newAccessToken = jwt.sign({ id: existingUser.id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "5m" })
+    const newAccessToken = jwt.sign({ id: existingUser.id, communityId: communityId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "5m" })
     const newRefreshToken = uuidv4()
 
     // 5. Delete old refresh tokens for this user (Optional Cleanup)
@@ -201,6 +206,7 @@ const loginUser = async (req, res) => {
         data: {
             refreshToken: newRefreshToken,
             userId: existingUser.id,
+            communityId: communityId,
             // expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // 2 days
             expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 days
         }
@@ -209,14 +215,18 @@ const loginUser = async (req, res) => {
     // 7. Send the AT and RT in the cookies
     res.cookie("accessToken", newAccessToken, {
         httpOnly: true,
-        secure: true, // Required for cookies to be sent over HTTPS
-        sameSite: "None", // Required for cross-origin cookies
+        // secure: true, // Required for cookies to be sent over HTTPS
+        // sameSite: "None", // Required for cross-origin cookies
+        sameSite: "Lax",
+        secure: false
     })
 
     res.cookie("refreshToken", newRefreshToken, {
         httpOnly: true,
-        secure: true, // Required for cookies to be sent over HTTPS
-        sameSite: "None", // Required for cross-origin cookies
+        // secure: true, // Required for cookies to be sent over HTTPS
+        // sameSite: "None", // Required for cross-origin cookies
+        sameSite: "Lax",
+        secure: false
     })
 
     // 8. Return status 200 and login successful
@@ -224,7 +234,106 @@ const loginUser = async (req, res) => {
     return res.status(200).json({ success: true, message: "Login successful", user: { id: existingUser.id, email: existingUser.email, } })
 }
 
-const logoutUser = async (req, res) => {
+const loginUser = async (req, res) => {
+    // 0. This controller handles the login of the user
+    // 1. Get email, password from the req body
+    const { email, password, communityId } = req.body
+
+    // const userId = req.headers["x-user-id"];
+    // console.log("userId in loginUser:", userId)
+
+    if (!email || !password || !communityId) {
+        return res.status(400).json({ success: false, message: "Email, password and communityId are required" })
+    }
+
+    // 2. Check if the user exists in the db
+    const existingUser = await prisma.user.findUnique({
+        where: {
+            email: email
+        }
+    })
+
+    if (!existingUser) {
+        return res.status(401).json({ success: false, message: "User does not exists" })
+    }
+
+    // 3. Check if the password is correct
+    const isPasswordCorrect = await bcrypt.compare(password, existingUser.password)
+
+    if (!isPasswordCorrect) {
+        return res.status(401).json({ success: false, message: "Password is incorrect" })
+    }
+
+    // Step 3: Check membership via external service
+    try {
+        const membershipRes = await axios.get(
+            `http://localhost:3001/api/community/memberships/check`,
+            {
+                params: {
+                    userId: existingUser.id,
+                    communityId,
+                },
+            },
+            { withCredentials: true }
+        );
+
+        const isMember = membershipRes.data?.isMember;
+
+        if (!isMember) {
+            return res.status(403).json({
+                success: false,
+                message: "User is not a member of this community",
+            });
+        }
+    } catch (error) {
+        console.log("Error message:", error.message)
+        return res.status(500).json({ success: false, message: "Internal server error while checking membership" })
+    }
+
+
+    // 4. If the password is correct then create a new AT and RT
+    const newAccessToken = jwt.sign({ id: existingUser.id, communityId: communityId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "5m" })
+    const newRefreshToken = uuidv4()
+
+    // 5. Delete old refresh tokens for this user (Optional Cleanup)
+    await prisma.refreshToken.deleteMany({
+        where: { userId: existingUser.id }
+    });
+
+    // 6. Store the new RT in the db
+    await prisma.refreshToken.create({
+        data: {
+            refreshToken: newRefreshToken,
+            userId: existingUser.id,
+            communityId: communityId,
+            // expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // 2 days
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 days
+        }
+    })
+
+    // 7. Send the AT and RT in the cookies
+    res.cookie("accessToken", newAccessToken, {
+        httpOnly: true,
+        secure: false, // keep false for local HTTP testing
+        sameSite: "Lax", // ✅ okay for subdomains like lvh.me
+        domain: ".lvh.me", // ✅ important: allows cookies on all subdomains
+        path: "/",         // ✅ good practice
+    });
+
+    res.cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "Lax",
+        domain: ".lvh.me",
+        path: "/",
+    });
+
+    // 8. Return status 200 and login successful
+
+    return res.status(200).json({ success: true, message: "Login successful", user: { id: existingUser.id, email: existingUser.email, } })
+}
+
+const logoutUserOld = async (req, res) => {
     // 0. This controller handlers logging out a user
     // 1. Get RT from the cookies
     const { refreshToken } = req.cookies
@@ -242,8 +351,15 @@ const logoutUser = async (req, res) => {
         })
 
         // 3. Clear users cookies by deleting AT & RT
-        res.clearCookie("accessToken")
-        res.clearCookie("refreshToken")
+        // Match the options used during res.cookie
+        const cookieOptions = {
+            httpOnly: true,
+            sameSite: "Lax",
+            secure: false,
+        }
+
+        res.clearCookie("accessToken", cookieOptions)
+        res.clearCookie("refreshToken", cookieOptions)
 
         // 4. Send response with logged out successfully
         return res.status(200).json({ success: true, message: "Logged out successfully" })
@@ -254,17 +370,51 @@ const logoutUser = async (req, res) => {
 
 }
 
+const logoutUser = async (req, res) => {
+    // Always try to clear cookies, even if tokens are missing
+
+    // Define the cookie options (should match what you used in res.cookie)
+    const cookieOptions = {
+        domain: ".lvh.me",
+        path: "/",
+    }
+
+    try {
+        const { refreshToken } = req.cookies
+
+        if (refreshToken) {
+            // Delete the refresh token from DB if it exists
+            await prisma.refreshToken.deleteMany({
+                where: { refreshToken },
+            })
+        }
+
+        // Clear both access and refresh tokens from cookies
+        res.clearCookie("accessToken", cookieOptions)
+        res.clearCookie("refreshToken", cookieOptions)
+
+        return res.status(200).json({ success: true, message: "Logged out successfully" })
+    } catch (error) {
+        console.error("Logout error:", error)
+        // Still clear cookies in case of any error
+        res.clearCookie("accessToken", cookieOptions)
+        res.clearCookie("refreshToken", cookieOptions)
+
+        return res.status(500).json({ success: false, message: "Internal server error" })
+    }
+}
+
 // Verify Token controller
 const verifyToken = async (req, res) => {
     // 0. This controller get the req from the middleware from the api-gateway and checks if the token is valid
     // 1. Get AT from the req and check if it is valid using access token secret
-    const { accessToken, refreshToken } = req.body
+    // const { accessToken, refreshToken } = req.body
 
-    // const accessToken = req.cookies?.accessToken
-    // const refreshToken = req.cookies?.refreshToken
+    const accessToken = req.cookies?.accessToken
+    const refreshToken = req.cookies?.refreshToken
 
     if (!accessToken && !refreshToken) {
-        return res.status(401).json({ success: false, valid: false, message: "Unauthorized: No tokens provided" });
+        return res.status(401).json({ success: false, valid: false, message: "Unauthorized: No tokens provided to verify token" });
     }
 
     // 2. If AT is valid then return login successful
@@ -273,7 +423,13 @@ const verifyToken = async (req, res) => {
         console.log("decoded:", decoded)
 
         if (decoded) {
-            return res.status(200).json({ success: true, valid: true, message: "Login successful", user: decoded })
+            const user = await prisma.user.findUnique({
+                where: {
+                    id: decoded.id
+                },
+            })
+
+            return res.status(200).json({ success: true, valid: true, message: "Login successful", user })
         }
     } catch (error) {
         // return res.status(401).json({ message: "Token is invalid, checking refresh token..." })
@@ -306,13 +462,50 @@ const verifyToken = async (req, res) => {
         // 6. If the RT is valid then create a new AT using userid from the RT db
         const newAccessToken = jwt.sign({ id: storedRefreshToken.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "5m" })
 
-        // 7. Set the new AT in the cookies
-        res.cookie("accessToken", newAccessToken, {
-            httpOnly: true
+        // Fetch full user
+        const user = await prisma.user.findUnique({
+            where: { id: storedRefreshToken.userId },
+            select: {
+                id: true,
+                email: true,
+                username: true,
+                roles: true
+            }
         })
 
+        // 7. Set the new AT and RT in the cookies
+        // res.cookie("accessToken", newAccessToken, {
+        //     httpOnly: true,
+        //     sameSite: "Lax",
+        //     secure: false
+        // })
+
+        // res.cookie("refreshToken", refreshToken, {
+        //     httpOnly: true,
+        //     // secure: true, // Required for cookies to be sent over HTTPS
+        //     // sameSite: "None", // Required for cross-origin cookies
+        //     sameSite: "Lax",
+        //     secure: false
+        // })
+
+        // res.cookie("accessToken", newAccessToken, {
+        //     httpOnly: true,
+        //     secure: false, // keep false for local HTTP testing
+        //     sameSite: "Lax", // ✅ okay for subdomains like lvh.me
+        //     domain: ".lvh.me", // ✅ important: allows cookies on all subdomains
+        //     path: "/",         // ✅ good practice
+        // });
+
+        // res.cookie("refreshToken", refreshToken, {
+        //     httpOnly: true,
+        //     secure: false,
+        //     sameSite: "Lax",
+        //     domain: ".lvh.me",
+        //     path: "/",
+        // });
+
         // 8. Send the new AT in the response
-        return res.status(200).json({ success: true, valid: true, message: "Login successful", accessToken: newAccessToken, user: decoded })
+        return res.status(200).json({ success: true, valid: true, message: "Login successful", user })
 
     } catch (error) {
         return res.status(401).json({ success: false, valid: false, message: "Token is invalid" })

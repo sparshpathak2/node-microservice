@@ -13,65 +13,132 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ✅ Enum for Content Status
-enum ContentStatus {
+// ✅ Enum for Module Status
+enum ModuleStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
 }
 
-// ✅ ContentType Table (For Extendability)
-model ContentType {
+// ✅ Enum for Host Type
+enum HostType {
+  SPACE
+  COURSE
+  COHORT
+}
+
+// ✅ Enum for Module Types
+// enum ModuleType {
+//   FEED
+//   IMAGE
+//   EVENT
+//   CHAT
+//   ASSIGNMENT
+//   QUIZ
+//   CHALLENGE
+//   LESSON
+//   CERTIFICATE
+//   COURSE
+//   COHORT
+// }
+
+// ✅ ModuleType Table (e.g. Feed, Event, Image, etc.)
+model ModuleType {
   id        String   @id @default(uuid())
-  name      String   @unique // POSTS, EVENTS, CHATS, IMAGES
+  name      String   @unique // FEED, EVENT, IMAGE, CHAT, etc.
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relation
-  contents Content[]
+  // Relations
+  modules Module[]
 }
 
 // ✅ Content Table (Stores Metadata & Links to Space)
-model Content {
-  id            String        @id @default(uuid())
-  title         String
-  description   String?
-  contentTypeId String // FK to ContentType
-  spaceId       String // 🔥 Store Space ID (Foreign Key from Community Service)
-  createdBy     String // 🔥 Store User ID (Foreign Key from User Service)
-  status        ContentStatus @default(DRAFT)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+// model Content {
+//   id            String        @id @default(uuid())
+//   title         String
+//   description   String?
+//   contentTypeId String // FK to ContentType
+//   spaceId       String // 🔥 Store Space ID (Foreign Key from Community Service)
+//   createdBy     String // 🔥 Store User ID (Foreign Key from User Service)
+//   status        ContentStatus @default(DRAFT)
+//   createdAt     DateTime      @default(now())
+//   updatedAt     DateTime      @updatedAt
 
-  // Relations  
-  contentType ContentType @relation(fields: [contentTypeId], references: [id])
+//   // Relations  
+//   contentType ContentType @relation(fields: [contentTypeId], references: [id])
 
-  // ✅ Corrected Relations (Added `references` on child models)
-  postContent  Posts?
+//   // ✅ Corrected Relations (Added `references` on child models)
+//   postContent  Posts?
+//   eventContent Events?
+//   chatContent  Chats?
+//   imageContent Images?
+// }
+
+// model Module {
+//   id             String       @id @default(uuid())
+//   title          String
+//   // slug           String       @unique
+//   description    String?
+//   spaceId        String? // From Community Service (nullable if it's not inside a space)
+//   parentModuleId String? // Self-reference to parent module (for nesting)
+//   hostType       HostType? // SPACE / COURSE / COHORT — defines where this module lives
+//   createdBy      String
+//   status         ModuleStatus @default(DRAFT)
+//   moduleTypeId   String // FK to ModuleType
+//   createdAt      DateTime     @default(now())
+//   updatedAt      DateTime     @updatedAt
+
+//   // Relations
+//   type         ModuleType @relation(fields: [moduleTypeId], references: [id])
+//   parentModule Module?    @relation("Parent", fields: [parentModuleId], references: [id])
+//   subModules   Module[]   @relation("Parent")
+
+//   // 🔗 One-to-one relations to content types
+//   feedContent  Feeds?
+//   eventContent Events?
+//   chatContent  Chats?
+//   imageContent Images?
+// }
+
+model Module {
+  id   String @id @default(uuid())
+  slug String @unique
+
+  hostType HostType // COURSE / COHORT / SPACE
+  hostId   String // ID of the host entity
+
+  moduleTypeId String
+  createdBy    String
+  status       ModuleStatus @default(DRAFT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  type ModuleType @relation(fields: [moduleTypeId], references: [id])
+
+  // 🔗 One-to-one relations to content types
+  feedContent  Feeds?
   eventContent Events?
   chatContent  Chats?
   imageContent Images?
 }
 
-// ✅ Separate Tables for Each Content Type
-
-// 🔥 Posts (Text-based Content)
-model Posts {
+// ✅ Feed Module (Previously `Posts`)
+model Feeds {
   id        String   @id @default(uuid())
-  contentId String   @unique // FK to Content
-  title     String // 🔥 Post title
-  content   Json // 🔥 Editor.js JSON data (specific to posts)
-  createdBy String // 🔥 User who created the content
+  moduleId  String   @unique // FK to Module
+  content   Json // Editor.js JSON data
+  createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contentRel Content @relation(fields: [contentId], references: [id])
+  module Module @relation(fields: [moduleId], references: [id])
 }
 
 // 🔥 Events (With Date & Location)
 model Events {
   id        String   @id @default(uuid())
-  contentId String   @unique // FK to Content
+  moduleId  String   @unique // FK to Content
   eventDate DateTime
   location  String?
   createdBy String // 🔥 User who created the content
@@ -85,31 +152,31 @@ model Events {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contentRel Content @relation(fields: [contentId], references: [id])
+  module Module @relation(fields: [moduleId], references: [id])
 }
 
 // 🔥 Chats (Messages)
 model Chats {
   id        String   @id @default(uuid())
-  contentId String   @unique // FK to Content
+  moduleId  String   @unique // FK to Content
   message   String
   createdBy String // 🔥 User who created the content
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contentRel Content @relation(fields: [contentId], references: [id])
+  module Module @relation(fields: [moduleId], references: [id])
 }
 
 // 🔥 Images (With Image URL)
 model Images {
   id        String   @id @default(uuid())
-  contentId String   @unique // FK to Content
+  moduleId  String   @unique // FK to Content
   imageUrl  String
   createdBy String // 🔥 User who created the content
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contentRel Content @relation(fields: [contentId], references: [id])
+  module Module @relation(fields: [moduleId], references: [id])
 }
 
 // 🔥 User Model (Only FK Reference to User Service)

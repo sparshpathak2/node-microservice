@@ -40,6 +40,39 @@ export const getMembershipById = async (req, res) => {
     }
 }
 
+export const checkMembership = async (req, res) => {
+    const { userId, communityId } = req.query;
+
+    if (!userId || !communityId) {
+        return res.status(400).json({
+            success: false,
+            message: "userId and communityId are required",
+        });
+    }
+
+    try {
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_communityId: {
+                    userId,
+                    communityId,
+                },
+            },
+        });
+
+        if (!membership || membership.status !== "APPROVED") {
+            return res.status(200).json({ isMember: false });
+        }
+
+        return res.status(200).json({ isMember: true });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
 export const createMembership = async (req, res) => {
     // 0. This controller create a new membership
 
@@ -49,8 +82,8 @@ export const createMembership = async (req, res) => {
 
     try {
         // 2. Validate required fields
-        if (!communityId) {
-            return res.status(400).json({ success: false, message: "CommunityId is required" });
+        if (!communityId || !userId) {
+            return res.status(400).json({ success: false, message: "CommunityId and UserId are required" });
         }
 
         // 3. Validate communityId exists

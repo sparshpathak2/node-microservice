@@ -34,9 +34,12 @@ model RefreshToken {
   id           String   @id @default(uuid())
   refreshToken String
   userId       String
+  communityId  String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt    DateTime
   createdAt    DateTime @default(now())
+
+  @@unique([userId, communityId]) // Optional: one RT per user per community
 }
 
 model Role {

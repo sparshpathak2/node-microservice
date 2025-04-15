@@ -7,10 +7,19 @@ const router = express.Router();
 const COMMUNITY_SERVICE = process.env.COMMUNITY_SERVICE_URL || "http://localhost:3004";
 
 // Proxy routes for communities (Admins can manage communities)
-router.use("/communities", authMiddleware, permissionsMiddleware("Admin"), proxy(COMMUNITY_SERVICE, {
+// router.use("/communities", authMiddleware, permissionsMiddleware("Admin"), proxy(COMMUNITY_SERVICE, {
+//     proxyReqPathResolver: (req) => `/communities${req.url}`,
+//     proxyReqOptDecorator(proxyReqOpts, srcReq) {
+//         proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
+//         // proxyReqOpts.headers['x-user-role'] = srcReq.user.role;
+//         return proxyReqOpts;
+//     }
+// }));
+
+router.use("/communities", proxy(COMMUNITY_SERVICE, {
     proxyReqPathResolver: (req) => `/communities${req.url}`,
     proxyReqOptDecorator(proxyReqOpts, srcReq) {
-        proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
+        // proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
         // proxyReqOpts.headers['x-user-role'] = srcReq.user.role;
         return proxyReqOpts;
     }
@@ -27,10 +36,19 @@ router.use("/space-groups", authMiddleware, permissionsMiddleware("Admin"), prox
 }));
 
 // Proxy routes for spaces (All authenticated users can access spaces)
-router.use("/spaces", authMiddleware, permissionsMiddleware("Admin"), proxy(COMMUNITY_SERVICE, {
+// router.use("/spaces", authMiddleware, permissionsMiddleware("Admin"), proxy(COMMUNITY_SERVICE, {
+//     proxyReqPathResolver: (req) => `/spaces${req.url}`,
+//     proxyReqOptDecorator(proxyReqOpts, srcReq) {
+//         proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
+//         // proxyReqOpts.headers['x-user-role'] = srcReq.user.role;
+//         return proxyReqOpts;
+//     }
+// }));
+
+router.use("/spaces", proxy(COMMUNITY_SERVICE, {
     proxyReqPathResolver: (req) => `/spaces${req.url}`,
     proxyReqOptDecorator(proxyReqOpts, srcReq) {
-        proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
+        // proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
         // proxyReqOpts.headers['x-user-role'] = srcReq.user.role;
         return proxyReqOpts;
     }
@@ -47,10 +65,19 @@ router.use("/space-types", authMiddleware, permissionsMiddleware("Admin"), proxy
 }));
 
 // Proxy routes for memberships (Users can manage their own memberships)
-router.use("/memberships", authMiddleware, permissionsMiddleware("Admin"), proxy(COMMUNITY_SERVICE, {
+// router.use("/memberships", authMiddleware, permissionsMiddleware("Admin"), proxy(COMMUNITY_SERVICE, {
+//     proxyReqPathResolver: (req) => `/memberships${req.url}`,
+//     proxyReqOptDecorator(proxyReqOpts, srcReq) {
+//         proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
+//         // proxyReqOpts.headers['x-user-role'] = srcReq.user.role;
+//         return proxyReqOpts;
+//     }
+// }));
+
+router.use("/memberships", proxy(COMMUNITY_SERVICE, {
     proxyReqPathResolver: (req) => `/memberships${req.url}`,
     proxyReqOptDecorator(proxyReqOpts, srcReq) {
-        proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
+        // proxyReqOpts.headers['x-user-id'] = srcReq.user.id;
         // proxyReqOpts.headers['x-user-role'] = srcReq.user.role;
         return proxyReqOpts;
     }

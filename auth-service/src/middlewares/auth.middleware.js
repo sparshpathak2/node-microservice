@@ -50,7 +50,14 @@ const Auth = async (req, res, next) => {
             const newAccessToken = jwt.sign({ id: storedRefreshToken.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '5m' })
 
             // 7. Attach the new AT to the response cookies
-            res.cookie("accessToken", newAccessToken, { httpOnly: true, sameSite: "none", secure: true })
+            // res.cookie("accessToken", newAccessToken, { httpOnly: true, sameSite: "none", secure: true })
+            res.cookie("accessToken", newAccessToken, {
+                httpOnly: true,
+                secure: false, // keep false for local HTTP testing
+                sameSite: "Lax", // ✅ okay for subdomains like lvh.me
+                domain: ".lvh.me", // ✅ important: allows cookies on all subdomains
+                path: "/",         // ✅ good practice
+            });
             return next()
         }
         else {

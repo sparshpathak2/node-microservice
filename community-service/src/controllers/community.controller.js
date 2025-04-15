@@ -40,11 +40,42 @@ export const getCommunityById = async (req, res) => {
     }
 }
 
+export const getCommunityBySlug = async (req, res) => {
+    // 0. This controller gets community by id from the database
+    // 1. Get the id from the request params
+    const communitySlug = req.params.slug;
+
+    if (!communitySlug) {
+        return res.status(400).json({ success: false, message: "Community slus is required" })
+    }
+
+    // 2. Fetch the community from the database
+    try {
+        const community = await prisma.community.findUnique({
+            where: {
+                slug: communitySlug
+            }
+        })
+
+        if (!community) {
+            return res.status(404).json({ success: false, message: "Community not found" })
+        }
+
+        // 3. Send the community in the response
+        return res.status(200).json({ success: true, data: community })
+    } catch (error) {
+        // 4. Send the error if something goes wrong
+        return res.status(500).json({ success: false, message: "Interal server error" })
+    }
+}
+
 export const createCommunity = async (req, res) => {
     // 0. This controller create a new community
     // 1. Get the data from the request body
     const { name, description } = req.body
     const userId = req.headers["x-user-id"];
+
+    console.log("userId in create community controller:", userId)
 
     try {
         // 2. Check for community name uniqueness
