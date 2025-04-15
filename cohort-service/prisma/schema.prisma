@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Cohort {
+  id          String    @id @default(uuid())
+  moduleId    String    @unique // 1:1 with Module in content service
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model DiscussionThread {
+  id        String   @id @default(uuid())
+  moduleId  String   @unique // FK to Content table (type = DISCUSSION_THREAD)
+  title     String
+  createdBy String
+  pinned    Boolean  @default(false)
+  isLocked  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 🔗 Relations
+  replies DiscussionReply[]
+}
+
+model DiscussionReply {
+  id           String   @id @default(uuid())
+  discussionId String
+  message      String
+  createdBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  discussion DiscussionThread @relation(fields: [discussionId], references: [id])
+}
+
+model Assignment {
+  id          String    @id @default(uuid())
+  moduleId    String
+  title       String
+  description String?
+  dueDate     DateTime?
+  createdBy   String // User ID (mentor/admin)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  submissions        AssignmentSubmission[]
+  assignmentComments AssignmentComment[]
+}
+
+model AssignmentSubmission {
+  id           String           @id @default(uuid())
+  assignmentId String
+  userId       String // FK to User
+  submittedAt  DateTime? // null = not submitted yet
+  content      String? // Could be a URL, answer text, file link, etc.
+  fileUrl      String? // Optional file upload
+  status       SubmissionStatus @default(PENDING)
+  grade        Int? // Optional score out of X
+  feedback     String? // Optional mentor feedback
+  reviewedAt   DateTime? // When mentor graded/reviewed
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relations
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+
+  @@unique([assignmentId, userId]) // one submission per user per assignment
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  REVIEWED
+  LATE
+}
+
+model AssignmentComment {
+  id           String   @id @default(uuid())
+  assignmentId String // FK to Assignment
+  userId       String // FK to User (either mentor or student)
+  message      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+
+  @@index([assignmentId])
+  @@index([userId])
+}
