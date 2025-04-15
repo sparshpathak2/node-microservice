@@ -41,24 +41,45 @@ enum Difficulty {
 }
 
 // 🔥 Course Model
+// model Course {
+//   id          String       @id @default(uuid())
+//   title       String
+//   description String?
+//   spaceId     String // Reference to Space (Community Service)
+//   createdBy   String // Reference to User Service
+//   price       Float? // If paid
+//   accessType  CourseAccess @default(FREE)
+//   createdAt   DateTime     @default(now())
+//   updatedAt   DateTime     @updatedAt
+
+//   // Relations
+//   space       Space         @relation(fields: [spaceId], references: [id])
+//   user        User          @relation(fields: [createdBy], references: [id])
+//   sections    Section[]     @relation(name: "CourseToSections")
+//   lessons     Lesson[]      @relation(name: "CourseToLessons") // Standalone Lessons
+//   enrollment  Enrollment[]
+//   certificate Certificate[]
+// }
+
 model Course {
   id          String       @id @default(uuid())
   title       String
   description String?
-  spaceId     String // Reference to Space (Community Service)
-  creatorId   String // Reference to User Service
+  moduleId    String
+  createdBy   String // Reference to User Service
   price       Float? // If paid
   accessType  CourseAccess @default(FREE)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   // Relations
-  space       Space         @relation(fields: [spaceId], references: [id])
-  creator     User          @relation(fields: [creatorId], references: [id])
+  user        User          @relation(fields: [createdBy], references: [id])
   sections    Section[]     @relation(name: "CourseToSections")
-  lessons     Lesson[]      @relation(name: "CourseToLessons") // Standalone Lessons
+  // lessons     Lesson[]      @relation(name: "CourseToLessons")
   enrollment  Enrollment[]
   certificate Certificate[]
+  Space       Space?        @relation(fields: [spaceId], references: [id])
+  spaceId     String?
 }
 
 // 🔥 Section Model (Grouping Lessons)
@@ -83,7 +104,7 @@ model Lesson {
   content      String? // Markdown Content
   type         LessonType @default(LESSON) // Either LESSON or QUIZ
   sectionId    String? // Nullable: Standalone Lesson
-  courseId     String
+  moduleId     String
   position     Int // Order within course
   isLocked     Boolean    @default(false) // 🔥 Drip Content (Unlocking Lessons)
   unlocksAfter String? // Reference to previous lesson that must be completed
@@ -93,10 +114,12 @@ model Lesson {
 
   // Relations
   section     Section?     @relation(fields: [sectionId], references: [id], name: "SectionToLessons")
-  course      Course       @relation(fields: [courseId], references: [id], name: "CourseToLessons")
+  // course      Course       @relation(fields: [courseId], references: [id], name: "CourseToLessons")
   attachments Attachment[]
-  quiz        Quiz?
+  // quiz        Quiz?
   video       Video?
+  // Course      Course?      @relation(fields: [courseId], references: [id])
+  courseId    String?
 }
 
 // 🔥 Video Model
@@ -130,8 +153,8 @@ model Attachment {
 // 🔥 Quiz Model
 model Quiz {
   id          String   @id @default(uuid())
-  lessonId    String   @unique
-  createdById String
+  moduleId    String   @unique
+  createdBy   String
   title       String
   description String?
   totalMarks  Int
@@ -141,8 +164,8 @@ model Quiz {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  createdBy   User          @relation(fields: [createdById], references: [id])
-  lesson      Lesson        @relation(fields: [lessonId], references: [id])
+  user        User          @relation(fields: [createdBy], references: [id])
+  // lesson      Lesson        @relation(fields: [lessonId], references: [id])
   questions   Question[]
   quizAttempt QuizAttempt[]
 }
